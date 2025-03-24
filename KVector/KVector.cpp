@@ -38,6 +38,33 @@ KVector<T> &KVector<T>::operator=(const KVector &vec)
 }
 
 template <typename T>
+KVector<T>::KVector(KVector &&vec)
+    : m_pVec(nullptr)
+    , m_size(vec.m_size)
+    , m_capacity(0)
+{
+    m_pVec = vec.m_pVec;
+    vec.m_pVec = nullptr;
+    m_capacity = vec.m_capacity;
+    vec.destroy();
+}
+
+template <typename T>
+KVector<T> &KVector<T>::operator=(KVector &&vec)
+{
+    if (this == &vec) {
+        return *this;
+    }
+    destroy();
+    m_pVec = vec.m_pVec;
+    vec.m_pVec = nullptr;
+    m_size = vec.m_size;
+    m_capacity = vec.m_capacity;
+    vec.destroy();
+    return *this;
+}
+
+template <typename T>
 KVector<T>::~KVector()
 {
     destroy();

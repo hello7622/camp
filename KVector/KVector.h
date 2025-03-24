@@ -8,12 +8,12 @@ template <typename T>
 class KVector 
 {
 public:
-    KVector(KVector&&) = delete;
-    KVector& operator=(KVector&&) = delete;
-    
+
     KVector();
     KVector(const KVector& vec);
     KVector& operator=(const KVector& vec);
+    KVector(KVector&& vec);
+    KVector& operator=(KVector&& vec);
     virtual ~KVector();
 
     KVector(size_t size, const T& value = T());
