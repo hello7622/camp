@@ -1,6 +1,9 @@
 #ifndef __KVECTOR_H__
 #define __KVECTOR_H__
 
+#include <cstddef>
+#include <initializer_list>
+
 template <typename T>
 class KVector 
 {
@@ -13,6 +16,9 @@ public:
     KVector& operator=(const KVector& vec);
     virtual ~KVector();
 
+    KVector(size_t size, const T& value = T());
+    KVector(const std::initializer_list<T>& list);
+
     void push(const T& value, size_t index = -1);
     void pop(size_t index = -1);
     void clear();
@@ -24,11 +30,15 @@ public:
     T& operator[](size_t index);
     const T& at(size_t index) const;
     const T& operator[](size_t index) const;
+
+    const T* begin() const;
+    const T* end() const;
+
 protected:
     void resize(size_t newCapacity);
     void destroy();
 private:
-    T* m_data;
+    T* m_pVec;
     size_t m_size;
     size_t m_capacity;
 };
