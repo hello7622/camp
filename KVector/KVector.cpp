@@ -1,120 +1,152 @@
 #include "KVector.h"
-
 #include <algorithm>
 #include <stdexcept>
+#include <iostream>
 
-template <typename T>
-KVector<T>::KVector()
-    : m_pVec(nullptr)
-    , m_size(0)
-    , m_capacity(0)
+template <typename T, typename Allocator>
+KVector<T, Allocator>::KVector(const Allocator& alloc)
+    : m_pVec(nullptr), m_size(0), m_capacity(0), m_alloc(alloc)
 {
     resize(10);
 }
 
-template <typename T>
-KVector<T>::KVector(const KVector& vec)
-    : m_pVec(nullptr)
-    , m_size(vec.m_size)
-    , m_capacity(0)
-{
-    resize(vec.m_capacity);
-    std::copy(vec.m_pVec, vec.m_pVec + m_size, m_pVec);
-}
-
-template <typename T>
-KVector<T> &KVector<T>::operator=(const KVector &vec)
-{
-    if (this == &vec) {
-        return *this;
-    }
-    if (m_capacity < vec.m_size) {
-        destroy();
-        resize(vec.m_size << 1);
-    }
-    m_size = vec.m_size;
-    std::copy(vec.m_pVec, vec.m_pVec + m_size, m_pVec);
-    return *this;
-}
-
-template <typename T>
-KVector<T>::KVector(KVector &&vec)
-    : m_pVec(nullptr)
-    , m_size(vec.m_size)
-    , m_capacity(0)
-{
-    m_pVec = vec.m_pVec;
-    vec.m_pVec = nullptr;
-    m_capacity = vec.m_capacity;
-    vec.destroy();
-}
-
-template <typename T>
-KVector<T> &KVector<T>::operator=(KVector &&vec)
-{
-    if (this == &vec) {
-        return *this;
-    }
-    destroy();
-    m_pVec = vec.m_pVec;
-    vec.m_pVec = nullptr;
-    m_size = vec.m_size;
-    m_capacity = vec.m_capacity;
-    vec.destroy();
-    return *this;
-}
-
-template <typename T>
-KVector<T>::~KVector()
-{
-    destroy();
-}
-
-template <typename T>
-KVector<T>::KVector(size_t size, const T &value)
-    : m_pVec(nullptr)
-    , m_size(0)
-    , m_capacity(0)
+template <typename T, typename Allocator>
+KVector<T, Allocator>::KVector(size_t size, const T& value, const Allocator& alloc)
+    : m_pVec(nullptr), m_size(0), m_capacity(0), m_alloc(alloc)
 {
     resize(size << 1);
     for (size_t i = 0; i < size; ++i) {
-        m_pVec[i] = value;
+        construct(&m_pVec[i], value);
     }
     m_size = size;
 }
 
-template <typename T>
-KVector<T>::KVector(const std::initializer_list<T> &list)
-    : m_pVec(nullptr)
-    , m_size(0)
-    , m_capacity(0)
+template <typename T, typename Allocator>
+KVector<T, Allocator>::KVector(const KVector& vec)
+    : m_pVec(nullptr), m_size(vec.m_size), m_capacity(0), m_alloc(
+          std::allocator_traits<Allocator>::select_on_container_copy_construction(vec.m_alloc))
 {
-    resize(list.size() << 1);
-    for (const T &value : list) {
-        m_pVec[m_size++] = value;
+    resize(vec.m_capacity);
+    for (size_t i = 0; i < m_size; ++i) {
+        construct(&m_pVec[i], vec.m_pVec[i]);
     }
 }
 
-template <typename T>
-void KVector<T>::push(const T &value, size_t index)
+template <typename T, typename Allocator>
+KVector<T, Allocator>::KVector(KVector&& vec) noexcept
+: m_pVec(vec.m_pVec), m_size(vec.m_size), m_capacity(vec.m_capacity), 
+m_alloc(std::move(vec.m_alloc))
+{
+    vec.m_pVec = nullptr;
+    vec.m_size = 0;
+    vec.m_capacity = 0;
+}
+
+template <typename T, typename Allocator>
+KVector<T, Allocator>::KVector(const std::initializer_list<T>& list, const Allocator& alloc)
+: m_pVec(nullptr), m_size(0), m_capacity(0), m_alloc(alloc)
+{
+    resize(list.size() << 1);
+    for (const T& value : list) {
+        construct(&m_pVec[m_size++], value);
+    }
+}
+
+template <typename T, typename Allocator>
+KVector<T, Allocator>::~KVector()
+{
+    destroy();
+}
+
+template <typename T, typename Allocator>
+KVector<T, Allocator>& KVector<T, Allocator>::operator=(const KVector& vec)
+{
+    if (this == &vec) {
+        return *this;
+    }
+
+    // 处理分配器传播
+    if (std::allocator_traits<Allocator>::propagate_on_container_copy_assignment::value) {
+        m_alloc = vec.m_alloc;
+    }
+
+    if (m_capacity < vec.m_size) {
+        destroy();
+        resize(vec.m_size << 1);
+    }
+
+    m_size = vec.m_size;
+    for (size_t i = 0; i < m_size; ++i) {
+        construct(&m_pVec[i], vec.m_pVec[i]);
+    }
+    return *this;
+}
+
+template <typename T, typename Allocator>
+KVector<T, Allocator>& KVector<T, Allocator>::operator=(KVector&& vec) noexcept
+{
+    if (this == &vec) {
+        return *this;
+    }
+    
+    destroy();
+    
+    // 处理分配器传播
+    if (std::allocator_traits<Allocator>::propagate_on_container_move_assignment::value) {
+        m_alloc = std::move(vec.m_alloc);
+    }
+    
+    m_pVec = vec.m_pVec;
+    m_size = vec.m_size;
+    m_capacity = vec.m_capacity;
+    
+    vec.m_pVec = nullptr;
+    vec.m_size = 0;
+    vec.m_capacity = 0;
+    
+    return *this;
+}
+
+template <typename T, typename Allocator>
+void KVector<T, Allocator>::push(const T& value, size_t index)
 {
     if (m_size == m_capacity) {
         resize(m_capacity << 1);
     }
-    // index非负，故不设index == -1时的处理
+    
     if (index >= m_size) {
-        m_pVec[m_size++] = value;
+        construct(&m_pVec[m_size++], value);
     } else {
         for (size_t i = m_size; i > index; --i) {
-            m_pVec[i] = m_pVec[i - 1];
+            construct(&m_pVec[i], std::move(m_pVec[i - 1]));
+            destroy(&m_pVec[i - 1]);
         }
-        m_pVec[index] = value;
+        construct(&m_pVec[index], value);
         ++m_size;
     }
 }
 
-template <typename T>
-void KVector<T>::pop(size_t index)
+template <typename T, typename Allocator>
+void KVector<T, Allocator>::push(T&& value, size_t index)
+{
+    if (m_size == m_capacity) {
+        resize(m_capacity << 1);
+    }
+    
+    if (index >= m_size) {
+        construct(&m_pVec[m_size++], std::move(value));
+    } else {
+        for (size_t i = m_size; i > index; --i) {
+            construct(&m_pVec[i], std::move(m_pVec[i - 1]));
+            destroy(&m_pVec[i - 1]);
+        }
+        construct(&m_pVec[index], std::move(value));
+        ++m_size;
+    }
+}
+
+template <typename T, typename Allocator>
+void KVector<T, Allocator>::pop(size_t index)
 {
     if (m_size == 0) {
         return;
@@ -122,26 +154,45 @@ void KVector<T>::pop(size_t index)
     if (index >= m_size) {
         index = m_size - 1;
     }
+    
+    destroy(&m_pVec[index]);
     for (size_t i = index; i < m_size - 1; ++i) {
-        m_pVec[i] = m_pVec[i + 1];
+        construct(&m_pVec[i], std::move(m_pVec[i + 1]));
+        destroy(&m_pVec[i + 1]);
     }
     --m_size;
+    
+    if ((m_size << 2) < m_capacity) {
+        resize(m_size << 1);
+    }
 }
 
-template <typename T>
-void KVector<T>::clear()
+template <typename T, typename Allocator>
+void KVector<T, Allocator>::clear()
 {
+    for (size_t i = 0; i < m_size; ++i) {
+        destroy(&m_pVec[i]);
+    }
     m_size = 0;
+    resize(10);
 }
 
-template <typename T>
-size_t KVector<T>::size() const
+template <typename T, typename Allocator>
+void KVector<T, Allocator>::reserve(size_t new_capacity)
+{
+    if (new_capacity > m_capacity) {
+        resize(new_capacity);
+    }
+}
+
+template <typename T, typename Allocator>
+size_t KVector<T, Allocator>::size() const noexcept
 {
     return m_size;
 }
 
-template <typename T>
-size_t KVector<T>::index(const T &value) const
+template <typename T, typename Allocator>
+size_t KVector<T, Allocator>::index(const T &value) const
 {
     for (size_t i = 0; i < m_size; ++i) {
         if (m_pVec[i] == value) {
@@ -151,14 +202,14 @@ size_t KVector<T>::index(const T &value) const
     return -1;
 }
 
-template <typename T>
-bool KVector<T>::empty() const
+template <typename T, typename Allocator>
+bool KVector<T, Allocator>::empty() const noexcept
 {
     return m_size == 0;
 }
 
-template <typename T>
-T &KVector<T>::at(size_t index)
+template <typename T, typename Allocator>
+T &KVector<T, Allocator>::at(size_t index)
 {
     if (index >= m_size) {
         throw std::out_of_range("索引越界");
@@ -166,14 +217,14 @@ T &KVector<T>::at(size_t index)
     return m_pVec[index];
 }
 
-template <typename T>
-T &KVector<T>::operator[](size_t index)
+template <typename T, typename Allocator>
+T &KVector<T, Allocator>::operator[](size_t index)
 {
     return at(index);
 }
 
-template <typename T>
-const T &KVector<T>::at(size_t index) const
+template <typename T, typename Allocator>
+const T &KVector<T, Allocator>::at(size_t index) const
 {
     if (index >= m_size) {
         throw std::out_of_range("索引越界 const");
@@ -181,46 +232,88 @@ const T &KVector<T>::at(size_t index) const
     return m_pVec[index];
 }
 
-template <typename T>
-const T &KVector<T>::operator[](size_t index) const
+template <typename T, typename Allocator>
+const T &KVector<T, Allocator>::operator[](size_t index) const
 {
     return at(index);
 }
 
-template <typename T>
-typename KVector<T>::Iterator KVector<T>::begin() const
+template <typename T, typename Allocator>
+const T *KVector<T, Allocator>::begin() const
 {
     return m_pVec;
 }
 
-template <typename T>
-typename KVector<T>::Iterator KVector<T>::end() const
+template <typename T, typename Allocator>
+const T *KVector<T, Allocator>::end() const
 {
     return m_pVec + m_size;
 }
 
-template <typename T>
-void KVector<T>::resize(size_t newCapacity)
+template <typename T, typename Allocator>
+void KVector<T, Allocator>::resize(size_t new_capacity)
 {
-    if (newCapacity == m_capacity) {
+    if (new_capacity == m_capacity) {
         return;
     }
-    T* newData = new T[newCapacity];
+
+    pointer new_data = std::allocator_traits<Allocator>::allocate(m_alloc, new_capacity);
+    
     if (m_pVec) {
-        std::copy(m_pVec, m_pVec + m_size, newData);
-        delete[] m_pVec;
+        try {
+	 		for (size_t i = 0; i < m_size && i < new_capacity; ++i) {
+				construct(&new_data[i], std::move(m_pVec[i]));
+        	}
+    	} catch (...) {
+        	for (size_t i = 0; i < m_size && i < new_capacity; ++i) {
+				destroy(&new_data[i]);
+        	}
+         	std::allocator_traits<Allocator>::deallocate(m_alloc, new_data, new_capacity);
+		    throw;
+    	}
+
+     	for (size_t i = 0; i < m_size; ++i) {
+        		destroy(&m_pVec[i]);
+    	}
+
+        std::allocator_traits<Allocator>::deallocate(m_alloc, m_pVec, m_capacity);
     }
-    m_pVec = newData;
-    m_capacity = newCapacity;
+
+    m_pVec = new_data;
+    m_capacity = new_capacity;
+    if (m_size > m_capacity) {
+        m_size = m_capacity;
+    }
 }
 
-template <typename T>
-void KVector<T>::destroy()
+template <typename T, typename Allocator>
+void KVector<T, Allocator>::destroy()
 {
-    if (m_pVec) {
-        delete[] m_pVec;
-        m_pVec = nullptr;
+    for (size_t i = 0; i < m_size; ++i) {
+        destroy(&m_pVec[i]);
     }
+    if (m_pVec) {
+        std::allocator_traits<Allocator>::deallocate(m_alloc, m_pVec, m_capacity);
+    }
+    m_pVec = nullptr;
     m_size = 0;
     m_capacity = 0;
+}
+
+template <typename T, typename Allocator>
+void KVector<T, Allocator>::construct(pointer p, const T& value)
+{
+    std::allocator_traits<Allocator>::construct(m_alloc, p, value);
+}
+
+template <typename T, typename Allocator>
+void KVector<T, Allocator>::construct(pointer p, T&& value)
+{
+    std::allocator_traits<Allocator>::construct(m_alloc, p, std::move(value));
+}
+
+template <typename T, typename Allocator>
+void KVector<T, Allocator>::destroy(pointer p)
+{
+    std::allocator_traits<Allocator>::destroy(m_alloc, p);
 }
