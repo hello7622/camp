@@ -188,13 +188,13 @@ const T &KVector<T>::operator[](size_t index) const
 }
 
 template <typename T>
-const T *KVector<T>::begin() const
+typename KVector<T>::Iterator KVector<T>::begin() const
 {
     return m_pVec;
 }
 
 template <typename T>
-const T *KVector<T>::end() const
+typename KVector<T>::Iterator KVector<T>::end() const
 {
     return m_pVec + m_size;
 }

@@ -8,6 +8,7 @@ template <typename T>
 class KVector 
 {
 public:
+    typedef const T* Iterator; 
 
     KVector();
     KVector(const KVector& vec);
@@ -31,8 +32,8 @@ public:
     const T& at(size_t index) const;
     const T& operator[](size_t index) const;
 
-    const T* begin() const;
-    const T* end() const;
+    Iterator begin() const;
+    Iterator end() const;
 
 protected:
     void resize(size_t newCapacity);
