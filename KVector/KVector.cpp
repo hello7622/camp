@@ -239,13 +239,13 @@ const T &KVector<T, Allocator>::operator[](size_t index) const
 }
 
 template <typename T, typename Allocator>
-const T *KVector<T, Allocator>::begin() const
+typename KVector<T, Allocator>::Iterator KVector<T, Allocator>::begin() const
 {
     return m_pVec;
 }
 
 template <typename T, typename Allocator>
-const T *KVector<T, Allocator>::end() const
+typename KVector<T, Allocator>::Iterator KVector<T, Allocator>::end() const
 {
     return m_pVec + m_size;
 }

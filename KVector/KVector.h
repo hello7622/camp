@@ -17,6 +17,7 @@ public:
     using reference = T&;
     using const_reference = const T&;
     using size_type = size_t;
+    using Iterator = const T*;
 
     // 构造函数
     explicit KVector(const Allocator& alloc = Allocator());
@@ -47,8 +48,8 @@ public:
     const T& operator[](size_t index) const;
 
     // 迭代器
-    const T* begin() const;
-    const T* end() const;
+    Iterator begin() const;
+    Iterator end() const;
 
     // 分配器访问
     allocator_type get_allocator() const noexcept;
